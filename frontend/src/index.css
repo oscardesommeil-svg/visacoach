@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+
+  /* Palette VisaCoach (direction artistique inspirée visa.com) */
+  --blue: #1434a4;
+  --blue-mid: #1a52c8;
+  --blue-light: #ebf0ff;
+  --gold: #f7b731;
+  --gold-dark: #d4961a;
+  --white: #ffffff;
+  --ink: #0a0f2c;
+  --slate: #4a5580;
+  --mist: #f4f6fc;
+  --border: #dde3f5;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  @apply bg-white text-slate-800 antialiased;
+}
+
+/* Titres en serif Merriweather */
+.font-serif-title {
+  font-family: "Merriweather", Georgia, serif;
+}
+
+/* Styles utilitaires réutilisables */
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl bg-brand-600 px-6 py-3
+      font-semibold text-white shadow-sm transition hover:bg-brand-700
+      focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2
+      disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-xl border border-slate-300
+      bg-white px-6 py-3 font-semibold text-slate-700 transition hover:bg-slate-100;
+  }
+
+  .card {
+    @apply rounded-2xl border border-slate-200 bg-white p-6 shadow-sm;
+  }
+}

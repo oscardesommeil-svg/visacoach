@@ -1,0 +1,158 @@
+-- =====================================================================
+-- VisaCoach — Schéma Supabase (PostgreSQL)
+-- =====================================================================
+-- À exécuter dans l'éditeur SQL de Supabase (SQL Editor).
+-- Tables : diagnostics -> orders -> reports
+-- =====================================================================
+
+-- Extension pour générer des UUID (présente par défaut sur Supabase).
+create extension if not exists "pgcrypto";
+
+-- ---------------------------------------------------------------------
+-- Table : diagnostics
+-- Résultat du diagnostic gratuit (7 questions -> score 0-100).
+-- ---------------------------------------------------------------------
+create table if not exists public.diagnostics (
+    id          uuid primary key default gen_random_uuid(),
+    email       text not null,
+    full_name   text,
+    country     text,
+    answers     jsonb not null default '[]'::jsonb,
+    score       integer not null check (score >= 0 and score <= 100),
+    level       text not null check (level in ('faible', 'moyen', 'bon', 'excellent')),
+    created_at  timestamptz not null default now()
+);
+
+create index if not exists diagnostics_email_idx on public.diagnostics (email);
+create index if not exists diagnostics_created_at_idx on public.diagnostics (created_at desc);
+
+-- ---------------------------------------------------------------------
+-- Table : orders
+-- Une commande de paiement (CinetPay en FCFA ou Stripe en EUR).
+-- ---------------------------------------------------------------------
+create table if not exists public.orders (
+    id              uuid primary key default gen_random_uuid(),
+    diagnostic_id   uuid not null references public.diagnostics (id) on delete cascade,
+    email           text not null,
+    plan            text not null check (plan in ('rapport', 'suivi')),
+    provider        text not null check (provider in ('cinetpay', 'stripe')),
+    amount          integer not null,            -- FCFA pour CinetPay, centimes pour Stripe
+    currency        text not null,               -- 'XOF' ou 'EUR'
+    transaction_id  text not null unique,
+    status          text not null default 'pending'
+                        check (status in ('pending', 'paid', 'failed', 'refunded')),
+    created_at      timestamptz not null default now()
+);
+
+create index if not exists orders_diagnostic_id_idx on public.orders (diagnostic_id);
+create index if not exists orders_transaction_id_idx on public.orders (transaction_id);
+create index if not exists orders_status_idx on public.orders (status);
+
+-- ---------------------------------------------------------------------
+-- Table : reports
+-- Rapport personnalisé généré par Claude une fois le paiement validé.
+-- ---------------------------------------------------------------------
+create table if not exists public.reports (
+    id              uuid primary key default gen_random_uuid(),
+    diagnostic_id   uuid not null references public.diagnostics (id) on delete cascade,
+    order_id        uuid references public.orders (id) on delete set null,
+    plan            text not null check (plan in ('rapport', 'suivi')),
+    content         text not null,               -- Markdown
+    email_sent      boolean not null default false,
+    created_at      timestamptz not null default now()
+);
+
+create unique index if not exists reports_diagnostic_id_uidx on public.reports (diagnostic_id);
+
+-- ---------------------------------------------------------------------
+-- Row Level Security
+-- ---------------------------------------------------------------------
+-- Le backend utilise la clé `service_role` qui contourne la RLS. On active
+-- quand même la RLS pour bloquer tout accès direct via la clé `anon` publique.
+alter table public.diagnostics enable row level security;
+alter table public.orders      enable row level security;
+alter table public.reports     enable row level security;
+
+-- Aucune policy `anon`/`authenticated` n'est créée : par défaut, RLS activée
+-- sans policy = accès refusé pour ces rôles. Seul le backend (service_role)
+-- peut lire/écrire. Ajoutez des policies si vous exposez l'accès direct au front.
+
+
+-- =====================================================================
+-- Module « Dossier » : constitution et vérification IA des documents
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- Table : dossier_documents
+-- Un document uploadé par le candidat + le résultat de l'analyse IA.
+-- ---------------------------------------------------------------------
+create table if not exists public.dossier_documents (
+    id              uuid primary key default gen_random_uuid(),
+    diagnostic_id   uuid not null references public.diagnostics (id) on delete cascade,
+    type            text not null,               -- PASSEPORT, RELEVE_BANCAIRE, etc.
+    filename        text not null,
+    storage_path    text not null,               -- chemin dans Supabase Storage
+    status          text not null default 'EN_ATTENTE'
+                        check (status in ('EN_ATTENTE', 'VALIDE', 'ATTENTION', 'PROBLEME')),
+    feedback        text,
+    suggestions     jsonb,
+    note            integer check (note is null or (note >= 0 and note <= 100)),
+    created_at      timestamptz not null default now(),
+    updated_at      timestamptz not null default now()
+);
+
+create index if not exists dossier_documents_diagnostic_id_idx
+    on public.dossier_documents (diagnostic_id);
+create index if not exists dossier_documents_type_idx
+    on public.dossier_documents (diagnostic_id, type);
+
+-- ---------------------------------------------------------------------
+-- Table : dossier_progress
+-- Score de progression global du dossier (un par diagnostic).
+-- ---------------------------------------------------------------------
+create table if not exists public.dossier_progress (
+    id                  uuid primary key default gen_random_uuid(),
+    diagnostic_id       uuid not null unique references public.diagnostics (id) on delete cascade,
+    score_global        integer not null default 0 check (score_global >= 0 and score_global <= 100),
+    documents_requis    jsonb not null default '[]'::jsonb,  -- types requis selon le profil
+    documents_valides   integer not null default 0,
+    documents_total     integer not null default 0,
+    updated_at          timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------
+-- RLS (mêmes règles : seul le service_role accède)
+-- ---------------------------------------------------------------------
+alter table public.dossier_documents enable row level security;
+alter table public.dossier_progress  enable row level security;
+
+-- ---------------------------------------------------------------------
+-- Supabase Storage : bucket privé pour les documents du dossier
+-- ---------------------------------------------------------------------
+-- Bucket privé : seul le backend (service_role) lit/écrit les fichiers.
+insert into storage.buckets (id, name, public)
+values ('dossier-documents', 'dossier-documents', false)
+on conflict (id) do nothing;
+
+
+-- =====================================================================
+-- Authentification : rattachement des diagnostics aux comptes utilisateurs
+-- =====================================================================
+-- Colonne user_id reliée à auth.users (NULL pour les diagnostics anonymes).
+alter table public.diagnostics
+    add column if not exists user_id uuid references auth.users (id) on delete set null;
+
+create index if not exists idx_diagnostics_user_id on public.diagnostics (user_id);
+
+-- RLS : un utilisateur connecté ne lit que ses propres diagnostics.
+-- (La RLS est déjà activée plus haut ; on (re)crée la policy de lecture.)
+drop policy if exists "users_own_diagnostics" on public.diagnostics;
+create policy "users_own_diagnostics"
+    on public.diagnostics for select
+    using (user_id = auth.uid() or user_id is null);
+
+-- NOTE confidentialité : la clause « or user_id is null » laisse tout utilisateur
+-- connecté lire les diagnostics anonymes. Pour un cloisonnement strict en prod,
+-- retirez « or user_id is null » (les diagnostics anonymes ne seront alors lisibles
+-- que par le backend via la clé service_role).
+
