@@ -95,6 +95,64 @@ export interface Conseils {
   points_faibles: string[];
 }
 
+// --- Visa Étudiant ---------------------------------------------------
+export interface EtudiantDiagnosticPayload {
+  pays_destination: string;
+  niveau_etudes: string;
+  domaine: string;
+  niveau_francais: string;
+  test_langue?: string;
+  etablissement: string;
+  campus_france_status: string;
+  budget_mensuel: string;
+  garant: boolean;
+  situation_academique: string;
+}
+
+export interface EtudiantDiagnosticResult {
+  id: string;
+  score: number;
+  level: Level;
+  summary: string;
+  pays_destination: string;
+  niveau_etudes: string;
+  domaine: string;
+}
+
+export interface Universite {
+  nom: string;
+  ville: string;
+  programme: string;
+  type: string;
+  pourquoi: string;
+}
+
+export interface CampusFranceGuide {
+  etapes: string[];
+  questions: { question: string; reponse: string }[];
+  erreurs: string[];
+}
+
+export interface SimulationEntretien {
+  questions: { question: string; reponse_suggeree: string; evaluation: string }[];
+  conseils: string[];
+}
+
+export interface ChecklistVisa {
+  sections: { titre: string; items: string[] }[];
+}
+
+export interface Bourse {
+  nom: string;
+  organisme: string;
+  montant: string;
+  niveau: string[];
+  deadline: string;
+  lien: string;
+  eligible_pays: string[];
+  difficulte: string;
+}
+
 // ---------------------------------------------------------------------------
 // Helper générique
 // ---------------------------------------------------------------------------
@@ -250,6 +308,51 @@ export const api = {
     request<Conseils>(`/api/generation/${diagnostic_id}/conseils`, {
       method: "POST",
     }),
+
+  // Visa Étudiant
+  createEtudiantDiagnostic: (payload: EtudiantDiagnosticPayload) =>
+    request<EtudiantDiagnosticResult>("/api/etudiant/diagnostic", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  getEtudiantDiagnostic: (id: string) =>
+    request<EtudiantDiagnosticResult>(`/api/etudiant/diagnostic/${id}`),
+
+  etudiantUniversites: (diagnostic_id: string) =>
+    request<{ universites: Universite[] }>("/api/etudiant/universites", {
+      method: "POST",
+      body: JSON.stringify({ diagnostic_id }),
+    }),
+
+  etudiantLettreMotivation: (diagnostic_id: string) =>
+    request<GeneratedText>("/api/etudiant/lettre-motivation", {
+      method: "POST",
+      body: JSON.stringify({ diagnostic_id }),
+    }),
+
+  etudiantCampusFrance: (diagnostic_id: string) =>
+    request<CampusFranceGuide>("/api/etudiant/campus-france", {
+      method: "POST",
+      body: JSON.stringify({ diagnostic_id }),
+    }),
+
+  etudiantSimulation: (diagnostic_id: string) =>
+    request<SimulationEntretien>("/api/etudiant/simulation-entretien", {
+      method: "POST",
+      body: JSON.stringify({ diagnostic_id }),
+    }),
+
+  etudiantChecklistVisa: (diagnostic_id: string) =>
+    request<ChecklistVisa>("/api/etudiant/checklist-visa", {
+      method: "POST",
+      body: JSON.stringify({ diagnostic_id }),
+    }),
+
+  etudiantBourses: (pays: string, niveau?: string) =>
+    request<{ bourses: Bourse[] }>(
+      `/api/etudiant/bourses/${pays}${niveau ? `?niveau=${niveau}` : ""}`,
+    ),
 };
 
 export { API_URL };

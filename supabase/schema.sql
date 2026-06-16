@@ -156,3 +156,37 @@ create policy "users_own_diagnostics"
 -- retirez « or user_id is null » (les diagnostics anonymes ne seront alors lisibles
 -- que par le backend via la clé service_role).
 
+
+-- =====================================================================
+-- Module « Visa Étudiant » : parcours dédié (université, Campus France,
+-- bourses, logement, visa).
+-- =====================================================================
+create table if not exists public.etudiant_diagnostics (
+    id                      uuid primary key default gen_random_uuid(),
+    user_id                 uuid references auth.users (id) on delete set null,
+    pays_destination        text not null,
+    niveau_etudes           text not null,
+    domaine                 text not null,
+    niveau_francais         text not null,
+    test_langue             text,
+    etablissement_confirme  boolean not null default false,
+    campus_france_status    text,
+    budget_mensuel          text,
+    garant                  boolean not null default false,
+    situation_academique    text,
+    score                   integer check (score is null or (score >= 0 and score <= 100)),
+    modules_status          jsonb not null default '{}'::jsonb,
+    created_at              timestamptz not null default now()
+);
+
+create index if not exists idx_etudiant_diagnostics_user_id
+    on public.etudiant_diagnostics (user_id);
+
+alter table public.etudiant_diagnostics enable row level security;
+
+-- RLS : un utilisateur connecté ne lit que ses propres diagnostics étudiants.
+drop policy if exists "users_own_etudiant_diagnostics" on public.etudiant_diagnostics;
+create policy "users_own_etudiant_diagnostics"
+    on public.etudiant_diagnostics for select
+    using (user_id = auth.uid() or user_id is null);
+

@@ -2,7 +2,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routers import diagnostics, dossier, generation, payments, reports
+from app.routers import (
+    diagnostics,
+    dossier,
+    etudiant,
+    generation,
+    payments,
+    reports,
+)
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -37,6 +44,7 @@ app.include_router(payments.router, prefix="/api/payments", tags=["payments"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(dossier.router, prefix="/api/dossier", tags=["dossier"])
 app.include_router(generation.router, prefix="/api/generation", tags=["generation"])
+app.include_router(etudiant.router, prefix="/api/etudiant", tags=["etudiant"])
 
 
 @app.get("/", tags=["meta"])

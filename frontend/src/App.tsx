@@ -11,6 +11,9 @@ import Offline from "./pages/Offline";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import ResetPassword from "./pages/ResetPassword";
+import Etudiant from "./pages/Etudiant";
+import EtudiantDiagnostic from "./pages/EtudiantDiagnostic";
+import EtudiantDashboard from "./pages/EtudiantDashboard";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./contexts/AuthContext";
 
@@ -132,6 +135,11 @@ export default function App() {
               </a>
             </li>
             <li>
+              <a href="/etudiant" style={navLink}>
+                🎓 Étudiants
+              </a>
+            </li>
+            <li>
               <a href="/#faq" style={navLink}>
                 FAQ
               </a>
@@ -201,6 +209,9 @@ export default function App() {
           </a>
           <a href="/#pricing" onClick={() => setMenuOpen(false)} style={mobileLink}>
             Tarifs
+          </a>
+          <a href="/etudiant" onClick={() => setMenuOpen(false)} style={mobileLink}>
+            🎓 Étudiants
           </a>
           <a href="/#faq" onClick={() => setMenuOpen(false)} style={mobileLink}>
             FAQ
@@ -302,6 +313,9 @@ export default function App() {
       >
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/etudiant" element={<Etudiant />} />
+          <Route path="/etudiant/diagnostic" element={<EtudiantDiagnostic />} />
+          <Route path="/etudiant/dashboard/:id" element={<EtudiantDashboard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route
