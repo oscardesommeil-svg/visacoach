@@ -288,10 +288,11 @@ Réponds UNIQUEMENT avec un JSON de la forme :
 {{"status": "...", "note": 0, "feedback": "...", "suggestions": ["...", "..."]}}"""
 
     try:
+        # Sortie JSON : pas de thinking (sinon le budget partagé tronque le JSON)
+        # + budget relevé pour laisser de la place au verdict.
         message = _client.messages.create(
             model=settings.CLAUDE_MODEL,
-            max_tokens=1500,
-            thinking={"type": "adaptive"},
+            max_tokens=2000,
             system=_SYSTEM_PROMPT,
             messages=[
                 {

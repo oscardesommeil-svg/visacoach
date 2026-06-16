@@ -121,16 +121,25 @@ def _profile_block(p: dict) -> str:
     )
 
 
-def _generate_text(system: str, user: str, max_tokens: int = 2500) -> str:
-    """Appelle Claude et renvoie le texte concaténé (hors blocs thinking)."""
+def _generate_text(
+    system: str, user: str, max_tokens: int = 2500, use_thinking: bool = True
+) -> str:
+    """Appelle Claude et renvoie le texte concaténé (hors blocs thinking).
+
+    `max_tokens` couvre la réflexion ET la sortie : pour une sortie JSON, passer
+    `use_thinking=False` afin que tout le budget aille au JSON (sinon il est
+    tronqué -> parse error).
+    """
+    kwargs: dict = {
+        "model": settings.CLAUDE_MODEL,
+        "max_tokens": max_tokens,
+        "system": system,
+        "messages": [{"role": "user", "content": user}],
+    }
+    if use_thinking:
+        kwargs["thinking"] = {"type": "adaptive"}
     try:
-        message = _client.messages.create(
-            model=settings.CLAUDE_MODEL,
-            max_tokens=max_tokens,
-            thinking={"type": "adaptive"},
-            system=system,
-            messages=[{"role": "user", "content": user}],
-        )
+        message = _client.messages.create(**kwargs)
     except anthropic.APIError as exc:
         raise HTTPException(
             status_code=502, detail=f"Erreur de génération IA : {exc}"
@@ -242,7 +251,8 @@ Réponds avec un JSON de la forme exacte :
 
 Chaque liste contient 3 à 6 éléments concrets et spécifiques à ce profil."""
 
-    raw = _generate_text(system, user, max_tokens=2500)
+    # Sortie JSON : pas de thinking + budget généreux (évite la troncature).
+    raw = _generate_text(system, user, max_tokens=4000, use_thinking=False)
 
     cleaned = raw.strip()
     if cleaned.startswith("```"):
