@@ -14,6 +14,9 @@ import ResetPassword from "./pages/ResetPassword";
 import Etudiant from "./pages/Etudiant";
 import EtudiantDiagnostic from "./pages/EtudiantDiagnostic";
 import EtudiantDashboard from "./pages/EtudiantDashboard";
+import NouveauDossier from "./pages/NouveauDossier";
+import DossierUniversel from "./pages/DossierUniversel";
+import MesDossiers from "./pages/MesDossiers";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { useAuth } from "./contexts/AuthContext";
 
@@ -146,7 +149,7 @@ export default function App() {
             </li>
             {user ? (
               <li>
-                <button type="button" onClick={() => navigate("/dashboard")} style={goldNavBtn}>
+                <button type="button" onClick={() => navigate("/mes-dossiers")} style={goldNavBtn}>
                   Mon dossier →
                 </button>
               </li>
@@ -220,7 +223,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => {
-                navigate("/dashboard");
+                navigate("/mes-dossiers");
                 setMenuOpen(false);
               }}
               style={mobileGoldBtn}
@@ -323,6 +326,30 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/mes-dossiers"
+            element={
+              <ProtectedRoute>
+                <MesDossiers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/nouveau-dossier"
+            element={
+              <ProtectedRoute>
+                <NouveauDossier />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dossier-universel/:id"
+            element={
+              <ProtectedRoute>
+                <DossierUniversel />
               </ProtectedRoute>
             }
           />

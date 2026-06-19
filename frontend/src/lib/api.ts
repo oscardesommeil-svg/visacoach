@@ -153,6 +153,93 @@ export interface Bourse {
   difficulte: string;
 }
 
+// --- Dossier universel ----------------------------------------------
+export type PieceStatut =
+  | "a_fournir"
+  | "uploade"
+  | "valide"
+  | "incomplet"
+  | "probleme";
+
+export interface ChecklistItem {
+  id: string;
+  label: string;
+  obligatoire: boolean;
+  format?: string;
+  astuce?: string;
+  risque_si_absent?: string;
+  validite?: string;
+  delai_obtention?: string;
+  lien_officiel?: string;
+  statut: PieceStatut;
+  note: number | null;
+  feedback_ia: string | null;
+  suggestions: string[];
+}
+
+export interface DossierPiece {
+  id: string;
+  type_document: string;
+  label: string;
+  obligatoire: boolean;
+  statut: PieceStatut;
+  note: number | null;
+  feedback_ia: string | null;
+  suggestions: string[];
+}
+
+export interface DossierUniversel {
+  id: string;
+  type_visa: string;
+  pays_destination: string;
+  pays_origine: string;
+  statut: string;
+  score_global: number;
+  score_coherence: number | null;
+  documents_total: number;
+  documents_valides: number;
+  pieces: DossierPiece[];
+}
+
+export interface DossierSummary {
+  id: string;
+  type_visa: string;
+  pays_destination: string;
+  pays_origine: string;
+  statut: string;
+  score_global: number;
+}
+
+export interface CoherenceResult {
+  score_coherence: number;
+  niveau: string;
+  incoherences_critiques: string[];
+  points_vigilance: string[];
+  points_forts: string[];
+  recommandations: string[];
+}
+
+export interface RisqueResult {
+  score_risque: number;
+  niveau: string;
+  facteurs_aggravants: { facteur: string; impact: string; strategie: string }[];
+  facteurs_rassurants: string[];
+  message_cle: string;
+}
+
+export interface DateDepotResult {
+  date_optimale: string;
+  jours_restants: number;
+  explication: string;
+}
+
+export interface AstuceResult {
+  type_document: string;
+  label: string;
+  astuce_officielle: string | null;
+  conseils: string;
+}
+
 // ---------------------------------------------------------------------------
 // Helper générique
 // ---------------------------------------------------------------------------
@@ -353,6 +440,70 @@ export const api = {
     request<{ bourses: Bourse[] }>(
       `/api/etudiant/bourses/${pays}${niveau ? `?niveau=${niveau}` : ""}`,
     ),
+
+  // Dossier universel
+  creerDossier: (payload: {
+    type_visa: string;
+    pays_destination: string;
+    pays_origine: string;
+  }) =>
+    request<{ dossier_id: string }>("/api/dossier-universel/creer", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  mesDossiers: () =>
+    request<{ dossiers: DossierSummary[] }>("/api/dossier-universel/mine"),
+
+  getDossier: (id: string) =>
+    request<DossierUniversel>(`/api/dossier-universel/${id}`),
+
+  getChecklist: (id: string) =>
+    request<{ checklist: ChecklistItem[] }>(
+      `/api/dossier-universel/${id}/checklist`,
+    ),
+
+  uploadPiece: async (
+    id: string,
+    type_document: string,
+    file: File,
+  ): Promise<{ piece: DossierPiece; score_global: number }> => {
+    const form = new FormData();
+    form.append("type_document", type_document);
+    form.append("file", file);
+    const response = await fetch(
+      `${API_URL}/api/dossier-universel/${id}/upload`,
+      { method: "POST", body: form },
+    );
+    if (!response.ok) {
+      let message = `Erreur ${response.status}`;
+      try {
+        const data = await response.json();
+        if (data?.detail) message = data.detail;
+      } catch {
+        /* non-JSON */
+      }
+      throw new Error(message);
+    }
+    return (await response.json()) as { piece: DossierPiece; score_global: number };
+  },
+
+  analyseCoherence: (id: string) =>
+    request<CoherenceResult>(`/api/dossier-universel/${id}/coherence`, {
+      method: "POST",
+    }),
+
+  getProfilRisque: (id: string) =>
+    request<RisqueResult>(`/api/dossier-universel/${id}/risque`),
+
+  getDateDepot: (id: string) =>
+    request<DateDepotResult>(`/api/dossier-universel/${id}/date-depot`),
+
+  getAstuce: (id: string, type_document: string) =>
+    request<AstuceResult>(`/api/dossier-universel/${id}/astuce`, {
+      method: "POST",
+      body: JSON.stringify({ type_document }),
+    }),
 };
 
 export { API_URL };

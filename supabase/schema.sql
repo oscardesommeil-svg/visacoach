@@ -190,3 +190,77 @@ create policy "users_own_etudiant_diagnostics"
     on public.etudiant_diagnostics for select
     using (user_id = auth.uid() or user_id is null);
 
+
+-- =====================================================================
+-- Parcours universel : un seul tunnel pour tous les types de visa.
+-- =====================================================================
+
+-- Dossier universel principal.
+create table if not exists public.dossiers_universels (
+    id                   uuid primary key default gen_random_uuid(),
+    user_id              uuid references auth.users (id) on delete cascade,
+    type_visa            text not null,        -- tourisme, etudiant, famille, affaires, medical, conjoint, transit
+    pays_destination     text not null,
+    pays_origine         text not null,
+    statut               text not null default 'en_cours'
+                            check (statut in ('en_cours', 'pret', 'depose', 'obtenu', 'refuse')),
+    score_global         integer not null default 0 check (score_global between 0 and 100),
+    score_coherence      integer,
+    profil_risque        jsonb,
+    date_depot_optimale  date,
+    created_at           timestamptz not null default now(),
+    updated_at           timestamptz not null default now()
+);
+
+create index if not exists idx_dossiers_universels_user_id
+    on public.dossiers_universels (user_id);
+
+-- Pièces (documents) du dossier universel.
+create table if not exists public.dossier_pieces (
+    id                uuid primary key default gen_random_uuid(),
+    dossier_id        uuid not null references public.dossiers_universels (id) on delete cascade,
+    type_document     text not null,
+    label             text not null,
+    obligatoire       boolean not null default true,
+    statut            text not null default 'a_fournir'
+                          check (statut in ('a_fournir', 'uploade', 'valide', 'incomplet', 'probleme')),
+    storage_path      text,
+    feedback_ia       text,
+    suggestions       jsonb,
+    note              integer check (note is null or (note between 0 and 100)),
+    donnees_extraites jsonb,
+    created_at        timestamptz not null default now(),
+    updated_at        timestamptz not null default now()
+);
+
+create index if not exists idx_dossier_pieces_dossier_id
+    on public.dossier_pieces (dossier_id);
+create index if not exists idx_dossier_pieces_type
+    on public.dossier_pieces (dossier_id, type_document);
+
+-- Analyses de cohérence inter-documents.
+create table if not exists public.analyses_coherence (
+    id                     uuid primary key default gen_random_uuid(),
+    dossier_id             uuid not null references public.dossiers_universels (id) on delete cascade,
+    score_coherence        integer,
+    niveau                 text,
+    incoherences_critiques jsonb,
+    points_vigilance       jsonb,
+    points_forts           jsonb,
+    recommandations        jsonb,
+    created_at             timestamptz not null default now()
+);
+
+create index if not exists idx_analyses_coherence_dossier_id
+    on public.analyses_coherence (dossier_id);
+
+-- RLS (lecture limitée au propriétaire ; le backend service_role contourne).
+alter table public.dossiers_universels enable row level security;
+alter table public.dossier_pieces      enable row level security;
+alter table public.analyses_coherence  enable row level security;
+
+drop policy if exists "users_own_dossiers" on public.dossiers_universels;
+create policy "users_own_dossiers"
+    on public.dossiers_universels for select
+    using (user_id = auth.uid() or user_id is null);
+

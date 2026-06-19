@@ -5,6 +5,7 @@ from app.core.config import settings
 from app.routers import (
     diagnostics,
     dossier,
+    dossier_universel,
     etudiant,
     generation,
     payments,
@@ -45,6 +46,11 @@ app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(dossier.router, prefix="/api/dossier", tags=["dossier"])
 app.include_router(generation.router, prefix="/api/generation", tags=["generation"])
 app.include_router(etudiant.router, prefix="/api/etudiant", tags=["etudiant"])
+app.include_router(
+    dossier_universel.router,
+    prefix="/api/dossier-universel",
+    tags=["dossier-universel"],
+)
 
 
 @app.get("/", tags=["meta"])
