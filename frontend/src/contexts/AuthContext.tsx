@@ -28,11 +28,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        setSession(data.session);
+        setUser(data.session?.user ?? null);
+      })
+      .catch((err) => {
+        // En prod, ne jamais rester bloqué sur "Chargement…" si getSession échoue.
+        console.error("[auth] getSession a échoué", err);
+      })
+      .finally(() => setLoading(false));
 
     const {
       data: { subscription },
