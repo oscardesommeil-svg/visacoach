@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
 const BLUE = "#1434A4";
@@ -41,6 +41,10 @@ type Tab = "login" | "signup";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // URL d'origine (mémorisée par ProtectedRoute) ou tableau de bord par défaut.
+  const from =
+    (location.state as { from?: string } | null)?.from || "/dashboard";
   const [tab, setTab] = useState<Tab>("login");
 
   // Champs partagés
@@ -66,7 +70,7 @@ export default function Login() {
       setError(error.message);
       return;
     }
-    navigate("/dashboard");
+    navigate(from, { replace: true });
   }
 
   async function handleSignup(e: React.FormEvent) {
@@ -92,7 +96,7 @@ export default function Login() {
       return;
     }
     if (data.session) {
-      navigate("/dashboard");
+      navigate(from, { replace: true });
     } else {
       setInfo(
         "Compte créé ! Vérifiez votre boîte mail pour confirmer votre adresse, " +
