@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
+import MartinAvatar from "../components/MartinAvatar";
 
 // Palette (direction artistique inspirée visa.com)
 const C = {
@@ -39,8 +40,9 @@ const PROCESS: { n: number; title: string; text: string }[] = [
   { n: 4, title: "Dépôt en confiance", text: "Lettre générée et conseils pour l'entretien consulaire." },
 ];
 
-const FEATURES: { icon: string; title: string; text: string }[] = [
+const FEATURES: { icon: string; title: string; text: string; martin?: boolean }[] = [
   { icon: "🎯", title: "Analyse IA personnalisée", text: "Un diagnostic adapté à votre pays, votre profil et votre motif de voyage." },
+  { icon: "🔵", martin: true, title: "Martin, votre conseiller", text: "Posez toutes vos questions à Martin, disponible 24h/24. Il connaît les procédures consulaires par cœur." },
   { icon: "📄", title: "Vérification de documents", text: "Chaque pièce est contrôlée par l'IA, avec un feedback concret." },
   { icon: "✍️", title: "Génération de lettres", text: "Lettre de motivation et d'invitation rédigées pour vous." },
   { icon: "🗣️", title: "Conseils d'entretien", text: "Questions probables et réponses suggérées pour le consulat." },
@@ -423,7 +425,11 @@ export default function Home() {
                 className="rounded-2xl bg-white p-6 shadow-sm"
                 style={{ border: `1px solid ${C.border}` }}
               >
-                <div className="text-3xl">{f.icon}</div>
+                {f.martin ? (
+                  <MartinAvatar size="md" />
+                ) : (
+                  <div className="text-3xl">{f.icon}</div>
+                )}
                 <h3 className="mt-4 font-bold" style={{ color: C.ink }}>
                   {f.title}
                 </h3>

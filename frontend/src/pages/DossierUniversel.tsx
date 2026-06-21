@@ -6,6 +6,7 @@ import ZoneTravail from "../components/dossier/ZoneTravail";
 import AnalyseCoherence from "../components/dossier/AnalyseCoherence";
 import ProfilRisque from "../components/dossier/ProfilRisque";
 import DateDepot from "../components/dossier/DateDepot";
+import MartinChat from "../components/MartinChat";
 import {
   api,
   type ChecklistItem,
@@ -306,6 +307,19 @@ export default function DossierUniversel() {
         <ProfilRisque result={risque} loading={risqueLoading} onLoad={runRisque} />
         <DateDepot result={dateDepot} loading={dateLoading} onLoad={runDate} />
       </div>
+
+      {/* Martin contextualisé sur le dossier */}
+      <MartinChat
+        dossierId={id}
+        diagnosticData={{
+          type_visa: dossier.type_visa,
+          pays_destination: dossier.pays_destination,
+          pays_origine: dossier.pays_origine,
+          score: score,
+          plan: dossier.plan,
+        }}
+        context="dossier"
+      />
     </div>
   );
 }

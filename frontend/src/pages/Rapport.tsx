@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import PDFEditor from "../components/PDFEditor";
+import MartinAvatar from "../components/MartinAvatar";
 import { api, type Report } from "../lib/api";
 
 /**
@@ -47,6 +48,15 @@ export default function Rapport() {
 
   return (
     <div className="mx-auto max-w-3xl">
+      {/* En-tête : rapport signé Martin */}
+      <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "24px" }}>
+        <MartinAvatar size="md" />
+        <div>
+          <div style={{ fontWeight: 700, color: "#0A0F2C" }}>Rapport rédigé par Martin</div>
+          <div style={{ fontSize: "0.8rem", color: "#4A5580" }}>Conseiller visa · VisaCoach</div>
+        </div>
+      </div>
+
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold text-slate-900">Votre rapport</h1>
         <span className="rounded-full bg-brand-50 px-3 py-1 text-sm font-semibold text-brand-700">

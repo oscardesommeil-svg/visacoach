@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import ScoreGauge from "../components/ScoreGauge";
 import PaymentModal from "../components/PaymentModal";
+import MartinAvatar from "../components/MartinAvatar";
 import { api, type DiagnosticResult } from "../lib/api";
 
 /**
@@ -45,6 +46,33 @@ export default function Score() {
       <div className="card flex flex-col items-center">
         <ScoreGauge score={result.score} level={result.level} />
         <p className="mt-6 text-center text-slate-600">{result.summary}</p>
+      </div>
+
+      {/* Mot de Martin sous le score */}
+      <div
+        style={{
+          background: "#EBF0FF",
+          borderRadius: "12px",
+          padding: "16px 20px",
+          display: "flex",
+          gap: "12px",
+          alignItems: "flex-start",
+          marginTop: "20px",
+        }}
+      >
+        <MartinAvatar size="sm" />
+        <div>
+          <div style={{ fontWeight: 700, fontSize: "0.85rem", color: "#1434A4", marginBottom: "4px" }}>
+            Martin — Conseiller visa
+          </div>
+          <div style={{ fontSize: "0.85rem", color: "#4A5580", lineHeight: 1.6 }}>
+            {result.score >= 70
+              ? "Votre dossier est sur la bonne voie ! Quelques améliorations et vos chances seront excellentes."
+              : result.score >= 50
+                ? "Votre profil a du potentiel mais nécessite des renforcements importants. Je vous guide étape par étape."
+                : "Ce score indique des risques sérieux. Mais ne vous découragez pas — j'ai aidé des profils similaires à obtenir leur visa."}
+          </div>
+        </div>
       </div>
 
       {/* Offre de déblocage */}

@@ -8,6 +8,7 @@ from app.routers import (
     dossier_universel,
     etudiant,
     generation,
+    martin,
     payments,
     reports,
 )
@@ -51,6 +52,7 @@ app.include_router(
     prefix="/api/dossier-universel",
     tags=["dossier-universel"],
 )
+app.include_router(martin.router, prefix="/api/martin", tags=["martin"])
 
 
 @app.get("/", tags=["meta"])

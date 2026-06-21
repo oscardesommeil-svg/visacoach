@@ -18,6 +18,7 @@ import NouveauDossier from "./pages/NouveauDossier";
 import DossierUniversel from "./pages/DossierUniversel";
 import MesDossiers from "./pages/MesDossiers";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import MartinChat from "./components/MartinChat";
 import { useAuth } from "./contexts/AuthContext";
 
 /** Événement `beforeinstallprompt` (non standardisé dans lib.dom). */
@@ -76,6 +77,8 @@ export default function App() {
   // La Home s'affiche pleine largeur ; les autres pages restent dans un
   // conteneur centré avec padding.
   const isHome = location.pathname === "/";
+  // Les pages dossier affichent leur propre Martin contextualisé.
+  const isDossierUniversel = location.pathname.startsWith("/dossier-universel/");
 
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
@@ -370,31 +373,37 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Bouton WhatsApp flottant (global) */}
-      <a
-        href="https://wa.me/33767787541?text=Bonjour%2C%20j%27ai%20une%20question%20sur%20VisaCoach"
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          position: "fixed",
-          bottom: "24px",
-          right: "24px",
-          zIndex: 1000,
-          background: "#25D366",
-          color: "white",
-          borderRadius: "50px",
-          padding: "12px 20px",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          fontWeight: 700,
-          fontSize: "0.875rem",
-          textDecoration: "none",
-          boxShadow: "0 4px 20px rgba(37,211,102,0.4)",
-        }}
-      >
-        💬 Une question ?
-      </a>
+      {/* Bouton WhatsApp flottant — uniquement sur la Home */}
+      {isHome && (
+        <a
+          href="https://wa.me/33767787541?text=Bonjour%2C%20j%27ai%20une%20question%20sur%20VisaCoach"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            right: "24px",
+            zIndex: 1000,
+            background: "#25D366",
+            color: "white",
+            borderRadius: "50px",
+            padding: "12px 20px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            fontWeight: 700,
+            fontSize: "0.875rem",
+            textDecoration: "none",
+            boxShadow: "0 4px 20px rgba(37,211,102,0.4)",
+          }}
+        >
+          💬 Une question ?
+        </a>
+      )}
+
+      {/* Martin, le conseiller visa — sur toutes les pages sauf la Home et les
+          pages dossier (qui affichent leur propre Martin contextualisé). */}
+      {!isHome && !isDossierUniversel && <MartinChat context="general" />}
     </div>
   );
 }
