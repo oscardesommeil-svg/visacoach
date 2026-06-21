@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import ChecklistOfficielle from "../components/dossier/ChecklistOfficielle";
 import ZoneTravail from "../components/dossier/ZoneTravail";
 import AnalyseCoherence from "../components/dossier/AnalyseCoherence";
@@ -17,7 +18,9 @@ import { paysLabel, visaLabel } from "../lib/dossier";
 
 export default function DossierUniversel() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
 
+  const [paying, setPaying] = useState(false);
   const [dossier, setDossier] = useState<Dossier | null>(null);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -86,6 +89,21 @@ export default function DossierUniversel() {
     }
   }
 
+  async function handlePaiement(plan: string) {
+    if (!id) return;
+    setPaying(true);
+    setError(null);
+    try {
+      const email = user?.email ?? "";
+      const { payment_url } = await api.checkoutDossier(id, email, plan);
+      localStorage.setItem("visacoach_dossier_paiement", id);
+      window.location.href = payment_url;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Paiement indisponible.");
+      setPaying(false);
+    }
+  }
+
   if (loading) return <p className="py-20 text-center text-slate-500">Chargement…</p>;
   if (error && !dossier) return <p className="py-20 text-center text-red-600">{error}</p>;
   if (!dossier || !id) return null;
@@ -100,6 +118,83 @@ export default function DossierUniversel() {
 
   return (
     <div className="space-y-6">
+      {/* Bannière de paiement (si non payé) */}
+      {dossier.statut_paiement !== "paye" && (
+        <div
+          style={{
+            background: "linear-gradient(135deg, #1434A4, #0A2875)",
+            borderRadius: "14px",
+            padding: "24px",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "16px",
+          }}
+        >
+          <div>
+            <div style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "4px" }}>
+              🔓 Débloquez l'accompagnement complet
+            </div>
+            <div style={{ fontSize: "0.85rem", opacity: 0.8 }}>
+              Rapport IA · Vérification documents · Analyse de cohérence · Conseils
+              entretien
+            </div>
+            {dossier.statut_paiement === "en_attente" && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (id) {
+                    api.verifierPaiement(id).then((r) => {
+                      if (r.paye) load();
+                    });
+                  }
+                }}
+                style={{
+                  marginTop: 8,
+                  background: "transparent",
+                  color: "rgba(255,255,255,0.85)",
+                  border: "1px solid rgba(255,255,255,0.4)",
+                  padding: "6px 12px",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontSize: "0.78rem",
+                }}
+              >
+                J'ai déjà payé — vérifier
+              </button>
+            )}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#F7B731" }}>
+                15 000 FCFA
+              </div>
+              <div style={{ fontSize: "0.72rem", opacity: 0.6 }}>≈ 22,90 €</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => handlePaiement("rapport")}
+              disabled={paying}
+              style={{
+                background: "#F7B731",
+                color: "#0A0F2C",
+                border: "none",
+                padding: "12px 24px",
+                borderRadius: "8px",
+                fontWeight: 800,
+                cursor: paying ? "not-allowed" : "pointer",
+                fontSize: "0.9rem",
+                opacity: paying ? 0.7 : 1,
+              }}
+            >
+              {paying ? "Redirection…" : "Payer maintenant →"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Zone 1 — En-tête */}
       <div className="card">
         <h1 className="text-2xl font-bold text-slate-900">
@@ -107,7 +202,39 @@ export default function DossierUniversel() {
         </h1>
         <p className="text-sm text-slate-500">
           Depuis : {orig.flag} {orig.label}
+          {dossier.beneficiaire_type === "proche" && (
+            <> · Bénéficiaire : {dossier.beneficiaire_prenom || "Proche"}</>
+          )}
         </p>
+
+        {dossier.beneficiaire_type === "proche" && (
+          <button
+            type="button"
+            onClick={() => {
+              const url = `${window.location.origin}/dossier-universel/${dossier.id}?shared=true`;
+              const message = `Bonjour ${dossier.beneficiaire_prenom || ""} ! J'ai créé ton dossier visa sur VisaCoach. Tu peux suivre et compléter tes documents ici : ${url}`;
+              window.open(
+                `https://wa.me/?text=${encodeURIComponent(message)}`,
+                "_blank",
+                "noopener,noreferrer",
+              );
+            }}
+            className="mt-3"
+            style={{
+              background: "#25D366",
+              color: "white",
+              border: "none",
+              padding: "10px 20px",
+              borderRadius: "8px",
+              fontWeight: 700,
+              cursor: "pointer",
+              fontSize: "0.875rem",
+            }}
+          >
+            📤 Envoyer le lien à {dossier.beneficiaire_prenom || "votre proche"} via
+            WhatsApp
+          </button>
+        )}
 
         <div className="mt-4">
           <div className="mb-1 flex justify-between text-sm">

@@ -24,7 +24,13 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.core.supabase import get_supabase
-from app.services import analyse_coherence, checklist_officielle, document_analyzer, profil_risque
+from app.services import (
+    analyse_coherence,
+    checklist_officielle,
+    cinetpay,
+    document_analyzer,
+    profil_risque,
+)
 
 router = APIRouter()
 
@@ -69,6 +75,10 @@ class CreerRequest(BaseModel):
     # Profil du demandeur (âge, situation familiale, propriétaire, historique
     # de voyage, statut emploi) — alimente le profil de risque consulaire.
     profil: dict | None = None
+    # Bénéficiaire du dossier (soi-même ou un proche).
+    beneficiaire_type: str = "moi-meme"
+    beneficiaire_prenom: str | None = None
+    beneficiaire_lien: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -155,15 +165,19 @@ def creer(
         raise HTTPException(status_code=500, detail="Dossier non créé.")
     dossier_id = res.data[0]["id"]
 
-    # Stocke le profil du demandeur (séparément, pour rester robuste si la
-    # colonne profil_demandeur n'a pas encore été ajoutée à une base existante).
+    # Stocke profil + bénéficiaire séparément (robuste si les colonnes n'ont pas
+    # encore été ajoutées à une base existante).
+    meta: dict = {
+        "beneficiaire_type": payload.beneficiaire_type,
+        "beneficiaire_prenom": payload.beneficiaire_prenom,
+        "beneficiaire_lien": payload.beneficiaire_lien,
+    }
     if payload.profil:
-        try:
-            supabase.table("dossiers_universels").update(
-                {"profil_demandeur": payload.profil}
-            ).eq("id", dossier_id).execute()
-        except Exception:  # noqa: BLE001 — colonne absente : on ignore
-            pass
+        meta["profil_demandeur"] = payload.profil
+    try:
+        supabase.table("dossiers_universels").update(meta).eq("id", dossier_id).execute()
+    except Exception:  # noqa: BLE001 — colonnes absentes : on ignore
+        pass
 
     checklist = checklist_officielle.get_checklist(
         payload.type_visa, payload.pays_destination
@@ -213,6 +227,12 @@ def get_dossier(dossier_id: str) -> dict:
         "statut": dossier["statut"],
         "score_global": dossier.get("score_global", 0),
         "score_coherence": dossier.get("score_coherence"),
+        "beneficiaire_type": dossier.get("beneficiaire_type", "moi-meme"),
+        "beneficiaire_prenom": dossier.get("beneficiaire_prenom"),
+        "beneficiaire_lien": dossier.get("beneficiaire_lien"),
+        "statut_paiement": dossier.get("statut_paiement", "gratuit"),
+        "plan": dossier.get("plan", "diagnostic"),
+        "montant_paye": dossier.get("montant_paye", 0),
         "documents_total": len(obligatoires),
         "documents_valides": valides,
         "pieces": [_serialize_piece(p) for p in pieces],
@@ -429,6 +449,91 @@ def get_coherence(dossier_id: str) -> dict:
         "verdict_consul": row.get("verdict_consul"),
         "probabilite_accord": row.get("probabilite_accord"),
     }
+
+
+# ---------------------------------------------------------------------------
+# Paiement par dossier (CinetPay) — chaque dossier se paie séparément
+# ---------------------------------------------------------------------------
+PLAN_PRIX_FCFA = {"diagnostic": 0, "rapport": 15000, "complet": 45000, "vip": 99000}
+
+
+class CheckoutRequest(BaseModel):
+    email: str
+    plan: str = "rapport"
+
+
+@router.post("/{dossier_id}/checkout")
+def checkout_dossier(
+    dossier_id: str,
+    payload: CheckoutRequest,
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+) -> dict:
+    """Crée un paiement CinetPay pour ce dossier (tarif réduit -20% si fidélité)."""
+    _get_dossier(dossier_id)
+    supabase = get_supabase()
+
+    base = PLAN_PRIX_FCFA.get(payload.plan, PLAN_PRIX_FCFA["rapport"])
+    # Réduction fidélité : -20% si l'utilisateur a déjà un dossier payé.
+    remise = False
+    if x_user_id:
+        autres = (
+            supabase.table("dossiers_universels")
+            .select("id")
+            .eq("user_id", x_user_id)
+            .eq("statut_paiement", "paye")
+            .limit(1)
+            .execute()
+        )
+        remise = bool(autres.data)
+    montant = round(base * 0.8 / 5) * 5 if remise else base  # arrondi multiple de 5 (XOF)
+
+    transaction_id = f"vc_dos_{uuid.uuid4().hex[:16]}"
+    try:
+        result = cinetpay.initiate_payment(
+            transaction_id=transaction_id,
+            amount=montant,
+            description=f"VisaCoach — dossier ({payload.plan})",
+            customer_email=payload.email,
+            metadata=dossier_id,
+        )
+    except cinetpay.CinetPayError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    try:
+        supabase.table("dossiers_universels").update(
+            {
+                "statut_paiement": "en_attente",
+                "plan": payload.plan,
+                "montant_paye": montant,
+                "paiement_transaction_id": transaction_id,
+                "updated_at": "now()",
+            }
+        ).eq("id", dossier_id).execute()
+    except Exception:  # noqa: BLE001 — colonnes absentes : on ignore
+        pass
+
+    return {"payment_url": result["payment_url"], "montant": montant, "remise": remise}
+
+
+@router.get("/{dossier_id}/verifier-paiement")
+def verifier_paiement(dossier_id: str) -> dict:
+    """Vérifie le statut du paiement CinetPay et bascule le dossier en 'paye'."""
+    dossier = _get_dossier(dossier_id)
+    if dossier.get("statut_paiement") == "paye":
+        return {"paye": True}
+    tid = dossier.get("paiement_transaction_id")
+    if not tid:
+        return {"paye": False}
+    try:
+        check = cinetpay.check_payment(tid)
+    except cinetpay.CinetPayError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    if check["status"] == "ACCEPTED":
+        get_supabase().table("dossiers_universels").update(
+            {"statut_paiement": "paye", "updated_at": "now()"}
+        ).eq("id", dossier_id).execute()
+        return {"paye": True}
+    return {"paye": False, "status": check["status"]}
 
 
 @router.post("/extraire-donnees/{piece_id}")

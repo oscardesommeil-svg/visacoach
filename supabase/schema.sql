@@ -220,6 +220,25 @@ create index if not exists idx_dossiers_universels_user_id
 alter table public.dossiers_universels
     add column if not exists profil_demandeur jsonb;
 
+-- Multi-bénéficiaires + paiement par dossier.
+alter table public.dossiers_universels
+    add column if not exists beneficiaire_type text default 'moi-meme';  -- moi-meme | proche
+alter table public.dossiers_universels
+    add column if not exists beneficiaire_prenom text;
+alter table public.dossiers_universels
+    add column if not exists beneficiaire_lien text;  -- mere|pere|conjoint|frere|soeur|enfant|ami|autre
+alter table public.dossiers_universels
+    add column if not exists statut_paiement text default 'gratuit';  -- gratuit | en_attente | paye
+alter table public.dossiers_universels
+    add column if not exists montant_paye integer default 0;
+alter table public.dossiers_universels
+    add column if not exists plan text default 'diagnostic';  -- diagnostic | rapport | complet | vip
+alter table public.dossiers_universels
+    add column if not exists paiement_transaction_id text;
+
+create index if not exists idx_dossiers_statut_paiement
+    on public.dossiers_universels (statut_paiement);
+
 -- Pièces (documents) du dossier universel.
 create table if not exists public.dossier_pieces (
     id                uuid primary key default gen_random_uuid(),

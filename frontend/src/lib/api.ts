@@ -204,6 +204,12 @@ export interface DossierUniversel {
   statut: string;
   score_global: number;
   score_coherence: number | null;
+  beneficiaire_type: string;
+  beneficiaire_prenom: string | null;
+  beneficiaire_lien: string | null;
+  statut_paiement: string;
+  plan: string;
+  montant_paye: number;
   documents_total: number;
   documents_valides: number;
   pieces: DossierPiece[];
@@ -216,6 +222,11 @@ export interface DossierSummary {
   pays_origine: string;
   statut: string;
   score_global: number;
+  beneficiaire_type?: string;
+  beneficiaire_prenom?: string | null;
+  beneficiaire_lien?: string | null;
+  statut_paiement?: string;
+  plan?: string;
 }
 
 export interface Incoherence {
@@ -482,11 +493,25 @@ export const api = {
     pays_destination: string;
     pays_origine: string;
     profil?: ProfilDemandeur;
+    beneficiaire_type?: string;
+    beneficiaire_prenom?: string | null;
+    beneficiaire_lien?: string | null;
   }) =>
     request<{ dossier_id: string }>("/api/dossier-universel/creer", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  checkoutDossier: (id: string, email: string, plan = "rapport") =>
+    request<{ payment_url: string; montant: number; remise: boolean }>(
+      `/api/dossier-universel/${id}/checkout`,
+      { method: "POST", body: JSON.stringify({ email, plan }) },
+    ),
+
+  verifierPaiement: (id: string) =>
+    request<{ paye: boolean; status?: string }>(
+      `/api/dossier-universel/${id}/verifier-paiement`,
+    ),
 
   mesDossiers: () =>
     request<{ dossiers: DossierSummary[] }>("/api/dossier-universel/mine"),

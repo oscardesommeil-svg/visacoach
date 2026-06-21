@@ -18,6 +18,31 @@ const STATUT_LABEL: Record<string, string> = {
   refuse: "Refusé",
 };
 
+const LIEN_ICONS: Record<string, string> = {
+  mere: "👩",
+  pere: "👨",
+  conjoint: "💑",
+  frere: "👦",
+  soeur: "👧",
+  enfant: "🧒",
+  ami: "🤝",
+  autre: "👥",
+};
+
+function beneficiaireLabel(d: DossierSummary): string {
+  if ((d.beneficiaire_type ?? "moi-meme") === "moi-meme") return "👤 Vous";
+  const icon = LIEN_ICONS[d.beneficiaire_lien ?? "autre"] ?? "👥";
+  return `${icon} ${d.beneficiaire_prenom || "Proche"}`;
+}
+
+function paiementBadge(d: DossierSummary): { label: string; color: string; bg: string } {
+  if (d.statut_paiement === "paye")
+    return { label: "✅ Payé", color: "#16A34A", bg: "#DCFCE7" };
+  if ((d.plan ?? "diagnostic") === "diagnostic")
+    return { label: "🆓 Diagnostic gratuit", color: "#2563EB", bg: "#DBEAFE" };
+  return { label: "💳 Paiement requis", color: "#D97706", bg: "#FEF3C7" };
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
@@ -38,6 +63,8 @@ export default function Dashboard() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  const aDejaUnDossierPaye = dossiers.some((d) => d.statut_paiement === "paye");
 
   async function handleSignOut() {
     await signOut();
@@ -80,6 +107,7 @@ export default function Dashboard() {
             {dossiers.map((d) => {
               const v = visaLabel(d.type_visa);
               const dest = paysLabel(d.pays_destination);
+              const badge = paiementBadge(d);
               return (
                 <button
                   key={d.id}
@@ -88,13 +116,22 @@ export default function Dashboard() {
                   className="card text-left transition hover:border-brand-300"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-bold" style={{ color: INK }}>
-                      {v.icon} {v.label} · {dest.flag} {dest.label}
-                    </h3>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                      {STATUT_LABEL[d.statut] ?? d.statut}
+                    <span className="text-sm font-semibold" style={{ color: SLATE }}>
+                      {beneficiaireLabel(d)}
+                    </span>
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs font-semibold"
+                      style={{ backgroundColor: badge.bg, color: badge.color }}
+                    >
+                      {badge.label}
                     </span>
                   </div>
+                  <h3 className="mt-1 font-bold" style={{ color: INK }}>
+                    {v.icon} {v.label} · {dest.flag} {dest.label}
+                  </h3>
+                  <span className="text-xs" style={{ color: SLATE }}>
+                    {STATUT_LABEL[d.statut] ?? d.statut}
+                  </span>
                   <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-200">
                     <div
                       className="h-full rounded-full"
@@ -104,7 +141,15 @@ export default function Dashboard() {
                   <p className="mt-2 text-sm" style={{ color: SLATE }}>
                     Progression : {d.score_global}%
                   </p>
-                  <span className="mt-3 inline-block text-sm font-semibold" style={{ color: BLUE }}>
+                  {aDejaUnDossierPaye && d.statut_paiement !== "paye" && (
+                    <span
+                      className="mt-2 inline-block rounded-full px-2 py-0.5 text-xs font-bold"
+                      style={{ backgroundColor: "#DCFCE7", color: "#16A34A" }}
+                    >
+                      🎁 -20% fidélité applicable
+                    </span>
+                  )}
+                  <span className="mt-3 block text-sm font-semibold" style={{ color: BLUE }}>
                     Continuer →
                   </span>
                 </button>
