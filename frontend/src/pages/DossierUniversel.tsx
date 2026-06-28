@@ -122,8 +122,14 @@ export default function DossierUniversel() {
           user_id: user?.id ?? "",
         }),
       });
-      if (!res.ok) throw new Error("Paiement par carte indisponible.");
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          typeof data.detail === "string"
+            ? data.detail
+            : "Paiement par carte indisponible.",
+        );
+      }
       if (!data.checkout_url) throw new Error("Lien de paiement manquant.");
       window.location.href = data.checkout_url;
     } catch (e) {
